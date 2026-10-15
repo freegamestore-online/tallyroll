@@ -42,10 +42,18 @@ export function ModeSelector({ best, dailyBest, saved, onStart, onResume, onDisc
   const today = utcDateKey();
 
   return (
+    // Sized to fit a 320×568 phone without scrolling: one row for resume, two
+    // cards side by side, then the two full-width mode cards.
     <div className="flex flex-col h-full min-h-0 justify-center gap-2 p-2">
       {saved && (
-        <Card title="Resume game" detail={describeMatch(saved)}>
-          <div className="grid grid-cols-2 gap-2">
+        <section className="flex items-center justify-between gap-2 rounded-xl border p-2" style={{ borderColor: "var(--line)", background: "var(--panel)" }}>
+          <div className="min-w-0">
+            <h2 className="font-semibold">Resume game</h2>
+            <p className="text-xs truncate" style={{ color: "var(--muted)" }}>
+              {describeMatch(saved)}
+            </p>
+          </div>
+          <div className="flex gap-1 shrink-0">
             <GameButton size="sm" onClick={onResume}>
               Resume
             </GameButton>
@@ -53,7 +61,7 @@ export function ModeSelector({ best, dailyBest, saved, onStart, onResume, onDisc
               Discard
             </GameButton>
           </div>
-        </Card>
+        </section>
       )}
 
       <div className="grid grid-cols-2 gap-2">
@@ -69,7 +77,7 @@ export function ModeSelector({ best, dailyBest, saved, onStart, onResume, onDisc
         </Card>
       </div>
 
-      <Card title="Pass & play" detail={`${players} players on one device`}>
+      <Card title="Pass & play">
         <Segments
           label="Players"
           options={PLAYER_COUNTS.map((n) => ({ value: n, label: String(n) }))}
@@ -81,7 +89,7 @@ export function ModeSelector({ best, dailyBest, saved, onStart, onResume, onDisc
         </GameButton>
       </Card>
 
-      <Card title="vs AI" detail={`You against the computer · ${DIFFICULTY_LABEL[difficulty]}`}>
+      <Card title="vs AI">
         <Segments
           label="Difficulty"
           options={DIFFICULTIES.map((d) => ({ value: d, label: DIFFICULTY_LABEL[d] }))}
@@ -96,14 +104,16 @@ export function ModeSelector({ best, dailyBest, saved, onStart, onResume, onDisc
   );
 }
 
-function Card({ title, detail, children }: { title: string; detail: string; children: ReactNode }) {
+function Card({ title, detail, children }: { title: string; detail?: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-2 rounded-xl border p-2" style={{ borderColor: "var(--line)", background: "var(--panel)" }}>
+    <section className="flex flex-col gap-1.5 rounded-xl border p-2" style={{ borderColor: "var(--line)", background: "var(--panel)" }}>
       <div>
         <h2 className="font-semibold">{title}</h2>
-        <p className="text-xs" style={{ color: "var(--muted)" }}>
-          {detail}
-        </p>
+        {detail && (
+          <p className="text-xs" style={{ color: "var(--muted)" }}>
+            {detail}
+          </p>
+        )}
       </div>
       {children}
     </section>

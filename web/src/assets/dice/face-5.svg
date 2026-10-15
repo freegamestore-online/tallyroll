@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Die showing 5">
+  <rect x="3" y="3" width="94" height="94" rx="18" fill="#fffdf7" stroke="#1a1a1a" stroke-width="3"/>
+  <rect x="9" y="9" width="82" height="82" rx="13" fill="none" stroke="#e5e0d3" stroke-width="2"/>
+  <circle cx="30" cy="30" r="8" fill="#1a1a1a"/>
+  <circle cx="70" cy="30" r="8" fill="#1a1a1a"/>
+  <circle cx="50" cy="50" r="8" fill="#1a1a1a"/>
+  <circle cx="30" cy="70" r="8" fill="#1a1a1a"/>
+  <circle cx="70" cy="70" r="8" fill="#1a1a1a"/>
+</svg>

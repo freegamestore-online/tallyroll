@@ -1,5 +1,11 @@
-import { GameButton } from "@freegamestore/games";
+import { GameButton, useGameSounds } from "@freegamestore/games";
 import { DICE_COUNT, MAX_ROLLS, canRoll } from "../dice/diceEngine";
+import face1 from "../assets/dice/face-1.svg";
+import face2 from "../assets/dice/face-2.svg";
+import face3 from "../assets/dice/face-3.svg";
+import face4 from "../assets/dice/face-4.svg";
+import face5 from "../assets/dice/face-5.svg";
+import face6 from "../assets/dice/face-6.svg";
 import { isAiTurn, totalOf, type Match } from "../game/match";
 import {
   LOWER_CATEGORIES,
@@ -10,18 +16,22 @@ import {
   scoreCategory,
   upperTotal,
   type Category,
+  type Scorecard,
 } from "../scoring/scorer";
 import { CATEGORY_LABELS } from "./labels";
+
+const FACES = [face1, face2, face3, face4, face5, face6];
 
 interface BoardProps {
   match: Match;
   onRoll: () => void;
   onHold: (index: number) => void;
   onClaim: (category: Category) => void;
+  onMenu: () => void;
 }
 
 /** Dice, roll button and the current player's score sheet. */
-export function Board({ match, onRoll, onHold, onClaim }: BoardProps) {
+export function Board({ match, onRoll, onHold, onClaim, onMenu }: BoardProps) {
   const player = match.players[match.current];
   const { dice } = match;
   const ai = isAiTurn(match);
@@ -29,25 +39,55 @@ export function Board({ match, onRoll, onHold, onClaim }: BoardProps) {
   const rollable = canRoll(dice) && !ai;
   const holdable = rolled && canRoll(dice) && !ai;
   const claimable = rolled && !ai;
-  const scores = player?.scores ?? {};
+  const scores: Scorecard = player?.scores ?? {};
   const bonus = calculateUpperBonus(scores);
   const upper = upperTotal(scores);
+  const sounds = useGameSounds();
 
-  const turnText = ai ? `${player?.name} is thinking…` : `${player?.name}'s turn`;
+  const turnText = ai
+    ? `${player?.name} is thinking…`
+    : player?.name === "You"
+      ? "Your turn"
+      : `${player?.name}'s turn`;
+
+  const roll = () => {
+    sounds.playDrop();
+    onRoll();
+  };
+  const claim = (c: Category) => {
+    sounds.playScore();
+    onClaim(c);
+  };
+
+  const row = (c: Category) => (
+    <ScoreRow
+      key={c}
+      label={CATEGORY_LABELS[c]}
+      scored={scores[c]}
+      preview={rolled ? scoreCategory(c, dice.values) : undefined}
+      disabled={!claimable}
+      onClick={() => claim(c)}
+    />
+  );
 
   return (
-    <div className="flex flex-col h-full min-h-0 gap-2 p-2">
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-sm">
-        <span className="font-semibold" style={{ color: "var(--accent)" }}>
-          {turnText}
-        </span>
-        <Standings match={match} />
+    <div className="table-felt flex flex-col h-full min-h-0 gap-2 p-2">
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="font-semibold" style={{ color: "var(--accent)" }}>
+            {turnText}
+          </span>
+          <Standings match={match} />
+        </div>
+        <GameButton size="sm" variant="ghost" onClick={onMenu}>
+          Menu
+        </GameButton>
       </div>
 
       <div className="flex justify-center gap-2">
         {Array.from({ length: DICE_COUNT }, (_, i) => {
-          const value = dice.values[i];
-          const held = dice.held[i];
+          const value = dice.values[i] ?? 0;
+          const held = dice.held[i] ?? false;
           return (
             <button
               key={i}
@@ -56,41 +96,36 @@ export function Board({ match, onRoll, onHold, onClaim }: BoardProps) {
               aria-pressed={held}
               disabled={!holdable}
               onClick={() => onHold(i)}
-              className="flex items-center justify-center w-12 h-12 min-w-[44px] min-h-[44px] rounded-xl border-2 text-2xl font-bold disabled:opacity-60"
-              style={{
-                borderColor: held ? "var(--accent)" : "var(--line-strong)",
-                background: held ? "var(--accent-soft)" : "var(--paper)",
-                color: "var(--ink)",
-              }}
+              className={`die flex items-center justify-center w-12 h-12 min-w-[44px] min-h-[44px] disabled:opacity-60 ${held ? "die-held" : ""}`}
             >
-              {value || "–"}
+              {value ? (
+                <img
+                  // Remounting on each roll restarts the tumble for every die that moved.
+                  key={dice.rollsUsed}
+                  src={FACES[value - 1]}
+                  alt=""
+                  className={`die-face ${held ? "" : "die-roll"}`}
+                />
+              ) : (
+                <span className="text-2xl font-bold" style={{ color: "var(--muted)" }}>
+                  –
+                </span>
+              )}
             </button>
           );
         })}
       </div>
 
-      <div className="flex flex-col items-center gap-1">
-        <GameButton block disabled={!rollable} onClick={onRoll}>
+      <div className="flex flex-col items-center">
+        <GameButton block disabled={!rollable} onClick={roll}>
           {rolled ? `Roll (${MAX_ROLLS - dice.rollsUsed} left)` : "Roll"}
         </GameButton>
-        <p className="text-xs" style={{ color: "var(--muted)" }}>
-          {rolled ? "Tap dice to hold them, then pick a category." : "Roll to start your turn."}
-        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-2 min-h-0 flex-1 text-sm">
         <section className="flex flex-col gap-1 min-h-0">
-          {UPPER_CATEGORIES.map((c) => (
-            <ScoreRow
-              key={c}
-              label={CATEGORY_LABELS[c]}
-              scored={scores[c]}
-              preview={rolled ? scoreCategory(c, dice.values) : undefined}
-              disabled={!claimable}
-              onClick={() => onClaim(c)}
-            />
-          ))}
-          <div className="flex justify-between px-2 pt-1" style={{ color: "var(--muted)" }}>
+          {UPPER_CATEGORIES.map(row)}
+          <div className="flex justify-between px-2 pt-1 text-xs" style={{ color: "var(--muted)" }}>
             <span>
               Bonus {Math.min(upper, UPPER_BONUS_THRESHOLD)}/{UPPER_BONUS_THRESHOLD}
             </span>
@@ -100,22 +135,7 @@ export function Board({ match, onRoll, onHold, onClaim }: BoardProps) {
           </div>
         </section>
 
-        <section className="flex flex-col gap-1 min-h-0">
-          {LOWER_CATEGORIES.map((c) => (
-            <ScoreRow
-              key={c}
-              label={CATEGORY_LABELS[c]}
-              scored={scores[c]}
-              preview={rolled ? scoreCategory(c, dice.values) : undefined}
-              disabled={!claimable}
-              onClick={() => onClaim(c)}
-            />
-          ))}
-          <div className="flex justify-between px-2 pt-1 font-semibold">
-            <span>Total</span>
-            <span>{player ? totalOf(player) : 0}</span>
-          </div>
-        </section>
+        <section className="flex flex-col gap-1 min-h-0">{LOWER_CATEGORIES.map(row)}</section>
       </div>
     </div>
   );
@@ -153,18 +173,18 @@ function ScoreRow({ label, scored, preview, disabled, onClick }: ScoreRowProps) 
       type="button"
       onClick={onClick}
       disabled={!canClaim}
-      className="flex items-center justify-between min-h-[36px] px-2 rounded-lg border disabled:cursor-default"
-      style={{
-        borderColor: "var(--line)",
-        background: canClaim ? "var(--panel)" : "transparent",
-        color: "var(--ink)",
-      }}
+      className={`score-row flex items-center justify-between ${canClaim ? "score-row-open" : ""}`}
     >
       <span>{label}</span>
       {claimed ? (
-        <span className="font-semibold">{scored}</span>
+        // Keyed on the claimed state so the tick plays when the value first appears.
+        <span key="scored" className="score-tick font-semibold">
+          {scored}
+        </span>
       ) : (
-        <span style={{ color: canClaim ? "var(--accent)" : "var(--muted)" }}>{preview ?? "–"}</span>
+        <span key="preview" style={{ color: canClaim ? "var(--accent)" : "var(--muted)" }}>
+          {preview ?? "–"}
+        </span>
       )}
     </button>
   );

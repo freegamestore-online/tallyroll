@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
-import { GameAuth, GameButton, GameShell, GameTopbar } from "@freegamestore/games";
+import { useCallback, useEffect, useState } from "react";
+import { GameAuth, GameShell, GameTopbar } from "@freegamestore/games";
 import type { Rng } from "./dice/diceEngine";
 import { readDailyBest, utcDateKey } from "./daily/daily";
+import { Celebration } from "./feel/Celebration";
+import { isFiveOfAKind } from "./feel/fiveOfAKind";
 import { useHighScore } from "./hooks/useHighScore";
 import {
   aiStep,
@@ -33,6 +35,10 @@ export default function App() {
   const [match, setMatch] = useState<Match | null>(null);
   const [savedGame, setSavedGame] = useState<Match | null>(loadSavedGame);
   const [soloBest, recordSolo] = useHighScore(SOLO_BEST_KEY);
+  // The roll whose five-of-a-kind burst has already played. Holds don't change
+  // the signature, so toggling a die never replays it.
+  const [celebrated, setCelebrated] = useState("");
+  const celebrationDone = useCallback((id: string) => setCelebrated(id), []);
 
   function start(next: MatchConfig) {
     setConfig(next);
@@ -90,29 +96,34 @@ export default function App() {
   const score = (c: Category) => setMatch((m) => (m && !isAiTurn(m) ? claim(m, c) : m));
 
   const current = match?.players[match.current];
+  // Five of a kind on a human's turn, once per roll.
+  const rollId = match ? `${match.dice.rollsUsed}:${match.dice.values.join("")}` : "";
+  const celebrate =
+    match !== null && !isAiTurn(match) && isFiveOfAKind(match.dice.values) && rollId !== celebrated;
   const topbar = (
     <GameTopbar
       title="Tallyroll"
+      about={
+        <p>
+          Tallyroll is free, MIT-licensed and tracks nothing. Built for{" "}
+          <a href="https://freegamestore.online" className="underline">
+            freegamestore.online
+          </a>
+          .
+        </p>
+      }
       stats={
         match
           ? [{ label: "Total", value: current ? totalOf(current) : 0, accent: true }]
           : [{ label: "Best", value: soloBest, accent: true }]
       }
-      actions={
-        <>
-          <GameAuth />
-          {match && (
-            <GameButton size="sm" variant="ghost" onClick={toMenu}>
-              Menu
-            </GameButton>
-          )}
-        </>
-      }
+      actions={<GameAuth />}
     />
   );
 
   return (
     <GameShell topbar={topbar}>
+      {celebrate && <Celebration id={rollId} onDone={celebrationDone} />}
       {!match ? (
         <ModeSelector
           best={soloBest}
@@ -128,7 +139,7 @@ export default function App() {
           {match.daily && <DailySubmit date={match.daily.date} score={totalOf(match.players[0]!)} />}
         </>
       ) : (
-        <Board match={match} onRoll={roll} onHold={hold} onClaim={score} />
+        <Board match={match} onRoll={roll} onHold={hold} onClaim={score} onMenu={toMenu} />
       )}
     </GameShell>
   );

@@ -43,7 +43,7 @@ export default defineConfig({
       manifest: {
         name: "Tallyroll",
         short_name: "Tallyroll",
-        description: "Tallyroll — free forever",
+        description: "Roll five dice and fill thirteen boxes in the classic Yatzy game. Free forever, no tracking.",
         start_url: "/",
         display: "standalone",
         background_color: "#0f0f0f",
