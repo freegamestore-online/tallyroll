@@ -16,6 +16,8 @@ import {
   type Rng,
 } from "../dice/diceEngine";
 import { chooseCategory, chooseHold, type Difficulty } from "../ai/aiStrategy";
+import { seedForDateKey } from "../daily/daily";
+import { createSeededStream } from "../rng";
 import {
   CATEGORIES,
   scoreCategory,
@@ -25,7 +27,7 @@ import {
   type Scorecard,
 } from "../scoring/scorer";
 
-export type GameMode = "solo" | "passAndPlay" | "vsAi";
+export type GameMode = "solo" | "passAndPlay" | "vsAi" | "daily";
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;
@@ -33,7 +35,15 @@ export const MAX_PLAYERS = 4;
 export type MatchConfig =
   | { mode: "solo" }
   | { mode: "passAndPlay"; players: number }
-  | { mode: "vsAi"; difficulty: Difficulty };
+  | { mode: "vsAi"; difficulty: Difficulty }
+  | { mode: "daily"; date: string };
+
+/** Seeded dice for a daily challenge. `draws` is how far into the stream play has got. */
+export interface DailyState {
+  readonly date: string;
+  readonly seed: number;
+  readonly draws: number;
+}
 
 export interface PlayerState {
   readonly name: string;
@@ -48,13 +58,20 @@ export interface Match {
   /** Index of the player whose turn it is. */
   readonly current: number;
   readonly dice: DiceState;
+  /** Present only in daily challenges; rolls then come from this seeded stream. */
+  readonly daily?: DailyState;
 }
 
 export function createMatch(config: MatchConfig): Match {
   let players: PlayerState[];
+  let daily: DailyState | undefined;
   switch (config.mode) {
     case "solo":
       players = [{ name: "You", scores: {} }];
+      break;
+    case "daily":
+      players = [{ name: "You", scores: {} }];
+      daily = { date: config.date, seed: seedForDateKey(config.date), draws: 0 };
       break;
     case "passAndPlay":
       if (config.players < MIN_PLAYERS || config.players > MAX_PLAYERS) {
@@ -72,7 +89,19 @@ export function createMatch(config: MatchConfig): Match {
       ];
       break;
   }
-  return { mode: config.mode, players, current: 0, dice: createDiceState() };
+  const match: Match = { mode: config.mode, players, current: 0, dice: createDiceState() };
+  return daily ? { ...match, daily } : match;
+}
+
+/**
+ * Run a step that may roll dice. Daily matches draw from their seeded stream
+ * and record how far it advanced; every other match uses `fallback`.
+ */
+export function withRandomness(match: Match, fallback: Rng, step: (rng: Rng) => Match): Match {
+  if (!match.daily) return step(fallback);
+  const stream = createSeededStream(match.daily.seed, match.daily.draws);
+  const next = step(stream.rng);
+  return { ...next, daily: { ...match.daily, draws: stream.draws() } };
 }
 
 export function openCategories(player: PlayerState): Category[] {

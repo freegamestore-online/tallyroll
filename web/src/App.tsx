@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { GameAuth, GameButton, GameShell, GameTopbar } from "@freegamestore/games";
 import type { Rng } from "./dice/diceEngine";
+import { readDailyBest, utcDateKey } from "./daily/daily";
 import { useHighScore } from "./hooks/useHighScore";
 import {
   aiStep,
@@ -11,10 +12,13 @@ import {
   isFinished,
   rollCurrent,
   totalOf,
+  withRandomness,
   type Match,
   type MatchConfig,
 } from "./game/match";
+import { clearSavedGame, loadSavedGame, saveGame } from "./game/save";
 import { Board } from "./ui/Board";
+import { DailySubmit } from "./ui/DailySubmit";
 import { ModeSelector } from "./ui/ModeSelector";
 import { Results } from "./ui/Results";
 import type { Category } from "./scoring/scorer";
@@ -27,16 +31,31 @@ const rng: Rng = Math.random;
 export default function App() {
   const [config, setConfig] = useState<MatchConfig | null>(null);
   const [match, setMatch] = useState<Match | null>(null);
+  const [savedGame, setSavedGame] = useState<Match | null>(loadSavedGame);
   const [soloBest, recordSolo] = useHighScore(SOLO_BEST_KEY);
 
   function start(next: MatchConfig) {
     setConfig(next);
     setMatch(createMatch(next));
+    setSavedGame(null);
+  }
+
+  function resume() {
+    if (!savedGame) return;
+    setConfig(null);
+    setMatch(savedGame);
+    setSavedGame(null);
+  }
+
+  function discard() {
+    clearSavedGame();
+    setSavedGame(null);
   }
 
   function toMenu() {
     setConfig(null);
     setMatch(null);
+    setSavedGame(loadSavedGame());
   }
 
   // Computer turns advance one step per timer tick, so each move is visible.
@@ -49,6 +68,13 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [match]);
 
+  // Keep the saved game in step with play. A finished game has nothing to resume.
+  useEffect(() => {
+    if (!match) return;
+    if (isFinished(match)) clearSavedGame();
+    else saveGame(match);
+  }, [match]);
+
   // Solo games count toward the high score once they finish.
   useEffect(() => {
     if (match?.mode === "solo" && isFinished(match)) {
@@ -56,8 +82,10 @@ export default function App() {
     }
   }, [match, recordSolo]);
 
-  // Human actions are ignored on computer turns.
-  const roll = () => setMatch((m) => (m && !isAiTurn(m) ? rollCurrent(m, rng) : m));
+  // Human actions are ignored on computer turns. Rolls go through withRandomness
+  // so daily matches draw from their seeded stream.
+  const roll = () =>
+    setMatch((m) => (m && !isAiTurn(m) ? withRandomness(m, rng, (r) => rollCurrent(m, r)) : m));
   const hold = (i: number) => setMatch((m) => (m && !isAiTurn(m) ? holdCurrent(m, i) : m));
   const score = (c: Category) => setMatch((m) => (m && !isAiTurn(m) ? claim(m, c) : m));
 
@@ -86,9 +114,19 @@ export default function App() {
   return (
     <GameShell topbar={topbar}>
       {!match ? (
-        <ModeSelector best={soloBest} onStart={start} />
+        <ModeSelector
+          best={soloBest}
+          dailyBest={readDailyBest(utcDateKey())}
+          saved={savedGame}
+          onStart={start}
+          onResume={resume}
+          onDiscard={discard}
+        />
       ) : isFinished(match) ? (
-        <Results match={match} onAgain={() => config && start(config)} onMenu={toMenu} />
+        <>
+          <Results match={match} onAgain={() => config && start(config)} onMenu={toMenu} />
+          {match.daily && <DailySubmit date={match.daily.date} score={totalOf(match.players[0]!)} />}
+        </>
       ) : (
         <Board match={match} onRoll={roll} onHold={hold} onClaim={score} />
       )}
