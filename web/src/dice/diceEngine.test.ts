@@ -8,6 +8,7 @@ import {
   resetTurn,
   rollDice,
   rollDie,
+  setHeld,
   toggleHold,
   type Rng,
 } from "./diceEngine";
@@ -125,6 +126,24 @@ describe("toggleHold", () => {
     const state = rollDice(createDiceState(), sequenceRng(0.5));
     expect(toggleHold(state, -1)).toBe(state);
     expect(toggleHold(state, DICE_COUNT)).toBe(state);
+  });
+});
+
+describe("setHeld", () => {
+  it("sets the whole hold pattern between rolls", () => {
+    const state = rollDice(createDiceState(), sequenceRng(0.5));
+    const next = setHeld(state, [true, false, true, false, false]);
+    expect(next.held).toEqual([true, false, true, false, false]);
+    expect(next.values).toEqual(state.values);
+    expect(next.rollsUsed).toBe(state.rollsUsed);
+  });
+
+  it("is ignored before the first roll and after the last one", () => {
+    const fresh = createDiceState();
+    expect(setHeld(fresh, [true, true, true, true, true])).toBe(fresh);
+    let done = createDiceState();
+    for (let i = 0; i < MAX_ROLLS; i++) done = rollDice(done, sequenceRng(0));
+    expect(setHeld(done, [true, true, true, true, true])).toBe(done);
   });
 });
 

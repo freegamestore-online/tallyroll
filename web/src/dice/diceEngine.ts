@@ -64,6 +64,15 @@ export function toggleHold(state: DiceState, index: number): DiceState {
   };
 }
 
+/**
+ * Set the whole hold pattern at once, e.g. from an AI choosing holds. Like
+ * toggleHold, it is ignored before the first roll and after the last one.
+ */
+export function setHeld(state: DiceState, held: readonly boolean[]): DiceState {
+  if (state.rollsUsed === 0 || state.rollsUsed >= MAX_ROLLS) return state;
+  return { values: state.values, held: held.slice(0, DICE_COUNT), rollsUsed: state.rollsUsed };
+}
+
 /** Start the next turn. Call after a category has been scored. */
 export function resetTurn(): DiceState {
   return createDiceState();
