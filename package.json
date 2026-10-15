@@ -9,6 +9,7 @@
     "build": "pnpm --filter @tallyroll/web build",
     "preview": "pnpm --filter @tallyroll/web preview",
     "typecheck": "pnpm --filter @tallyroll/web exec tsc -b",
+    "lint": "pnpm --filter @tallyroll/web lint",
     "test": "pnpm --filter @tallyroll/web test"
   }
 }
